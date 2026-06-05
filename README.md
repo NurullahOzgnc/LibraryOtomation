@@ -171,29 +171,3 @@ npm run build
 # Derlenen dosyalar `dist/` klasöründe oluşturulur
 npm start
 ```
-
-## 🤝 Katkı Yapma
-
-Katkılarınız hoş geldiniz! Lütfen bu adımları izleyin:
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/AmazingFeature`)
-3. Değişiklikleri commit edin (`git commit -m 'Add AmazingFeature'`)
-4. Branch'e push edin (`git push origin feature/AmazingFeature`)
-5. Pull Request açın
-
-## 📄 Lisans
-
-Bu proje açık kaynaklı ve herhangi bir lisans altında yayınlanmaktadır.
-
-## 👨‍💻 Yazar
-
-**NurullahOzgnc** - [GitHub Profili](https://github.com/NurullahOzgnc)
-
-## 📞 İletişim
-
-Sorularınız veya önerileriniz varsa, lütfen bir issue açın veya doğrudan iletişime geçin.
-
----
-
-⭐ Projeyi beğendiyseniz star vermeyi unutmayın!
