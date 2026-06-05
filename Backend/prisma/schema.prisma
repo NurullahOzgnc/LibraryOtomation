@@ -1,0 +1,242 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODEL: User
+// İlişkiler: User -> Transaction (1-N), User -> TermsAcceptance (1-N)
+// ─────────────────────────────────────────────────────────────────────────────
+model User {
+  id       String   @id @default(cuid())
+  name     String   @db.NVarChar(150)
+  email    String   @unique @db.NVarChar(255)
+  password String   @db.NVarChar(255)
+  phone    String?  @db.NVarChar(20)
+  
+  // DÜZELTME: Role model/enum yerine doğrudan String kullanıldı.
+  role     String   @default("USER") 
+
+  // Ban sistemi
+  isBanned Boolean @default(false)
+  banReason String? @db.NVarChar(500)
+  bannedAt DateTime?
+
+  // Terms & Policies kabul
+  termsAcceptedAt DateTime?
+
+  // Bir kullanıcının birden fazla ödünç işlemi olabilir (1-N)
+  transactions Transaction[]
+  
+  // Device rezervasyonları ve kullanım geçmişi
+  deviceReservations DeviceReservation[]
+  deviceUsageLogs     DeviceUsageLog[]
+
+  // Terms acceptance history
+  termsAcceptances TermsAcceptance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([isBanned])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODEL: Book
+// İlişkiler: Book -> Transaction (1-N), Book <-> Author (N-M), Book <-> Category (N-M)
+// ─────────────────────────────────────────────────────────────────────────────
+model Book {
+  id            String   @id @default(cuid())
+  isbn          String   @unique @db.NVarChar(20)
+  title         String   @db.NVarChar(500)
+  description   String?  @db.NVarChar(Max)
+  publisher     String?  @db.NVarChar(255)
+  publishedYear Int?
+  pageCount     Int?
+  language      String?  @db.NVarChar(10)
+  coverImage    String?  @db.NVarChar(500)  // URL (Google Books'tan)
+  stock         Int      @default(1)        // Mevcut ödünç verilebilir kopya sayısı
+  totalCopies   Int      @default(1)        // Toplam kopya sayısı
+
+  // Çoktan-çoğa: Bir kitabın birden fazla yazarı olabilir
+  authors    Author[]    @relation("BookAuthors")
+
+  // Çoktan-çoğa: Bir kitap birden fazla kategoriye ait olabilir
+  categories Category[]  @relation("BookCategories")
+
+  // Birden-çoğa: Bir kitap birden fazla ödünç işlemine konu olabilir
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isbn])
+  @@index([title])
+  @@map("books")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODEL: Author
+// İlişkiler: Author <-> Book (N-M)
+// ─────────────────────────────────────────────────────────────────────────────
+model Author {
+  id        String   @id @default(cuid())
+  name      String   @unique @db.NVarChar(255)
+
+  // Çoktan-çoğa: Bir yazarın birden fazla kitabı olabilir
+  books     Book[]   @relation("BookAuthors")
+
+  createdAt DateTime @default(now())
+
+  @@map("authors")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODEL: Category
+// İlişkiler: Category <-> Book (N-M)
+// ─────────────────────────────────────────────────────────────────────────────
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique @db.NVarChar(100)
+  slug      String   @unique @db.NVarChar(100)
+
+  // Çoktan-çoğa: Bir kategoride birden fazla kitap bulunabilir
+  books     Book[]   @relation("BookCategories")
+
+  createdAt DateTime @default(now())
+
+  @@map("categories")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODEL: Device
+// Cihazların ve ekipmanların yönetimi
+// ─────────────────────────────────────────────────────────────────────────────
+model Device {
+  id             String                @id @default(cuid())
+  name           String                @db.NVarChar(255)
+  description    String?               @db.NVarChar(Max)
+  location       String?               @db.NVarChar(255)
+  totalQuantity  Int                   @default(1)
+  brokenCount    Int                   @default(0)
+  status         String                @default("ACTIVE")
+
+  reservations   DeviceReservation[]
+  usageLogs      DeviceUsageLog[]
+
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([name])
+  @@map("devices")
+}
+
+model DeviceReservation {
+  id          String   @id @default(cuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  startAt     DateTime
+  endAt       DateTime
+  status      String   @default("CONFIRMED")
+  notes       String?  @db.NVarChar(500)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([deviceId])
+  @@index([userId])
+  @@index([status])
+  @@map("device_reservations")
+}
+
+model DeviceUsageLog {
+  id              String   @id @default(cuid())
+  deviceId        String
+  device          Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  usedAt          DateTime @default(now())
+  durationMinutes Int?
+  action          String   @default("RESERVED")
+  notes           String?  @db.NVarChar(500)
+
+  createdAt       DateTime @default(now())
+
+  @@index([deviceId])
+  @@index([userId])
+  @@map("device_usage_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODEL: Transaction (Ödünç İşlemi / Loan)
+// İlişkiler: Transaction -> User (N-1), Transaction -> Book (N-1)
+// ─────────────────────────────────────────────────────────────────────────────
+model Transaction {
+  id          String            @id @default(cuid())
+
+  // N-1: Birden fazla işlem aynı kullanıcıya ait olabilir
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // N-1: Birden fazla işlem aynı kitabı kapsayabilir (farklı zamanlarda)
+  bookId      String
+  book        Book              @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  borrowedAt  DateTime          @default(now())   // Ödünç alma tarihi
+  dueDate     DateTime                            // İade edilmesi gereken tarih
+  returnedAt  DateTime?                           // Gerçek iade tarihi (null = henüz iade edilmedi)
+
+  // DÜZELTME: Enum yerine doğrudan String kullanıldı.
+  status      String            @default("ACTIVE") 
+  
+  fineAmount  Float             @default(0)       // Gecikme cezası (TL)
+  notes       String?           @db.NVarChar(500) // Admin notu
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([bookId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("transactions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODEL: TermsAcceptance
+// İlişkiler: TermsAcceptance -> User (N-1)
+// ─────────────────────────────────────────────────────────────────────────────
+model TermsAcceptance {
+  id          String   @id @default(cuid())
+  
+  // N-1: Bir kullanıcı birden fazla kez kabul edebilir (güncellemeler için)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Hangi version'u kabul etti
+  version     String   @default("1.0")
+  
+  // IP adresi (opsiyonal, audit için)
+  ipAddress   String?  @db.NVarChar(50)
+  
+  // User agent (opsiyonal, audit için)
+  userAgent   String?  @db.NVarChar(500)
+  
+  acceptedAt  DateTime @default(now())
+
+  @@index([userId])
+  @@map("terms_acceptances")
+}
